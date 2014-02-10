@@ -1,8 +1,9 @@
-GPU based 2d fluid simulator.
+# GPU based 2d fluid simulator.
 
 Controls:
-	# Left mouse button: add force
-	# Right mouse button: add fluid
+
+* **Left mouse button** - add force
+* **Right mouse button** -  add fluid
 	
 GlSDK was used: http://glsdk.sourceforge.net/docs/html/index.html
 
