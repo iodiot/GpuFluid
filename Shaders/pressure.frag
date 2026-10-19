@@ -1,10 +1,10 @@
-#version 130
+#version 330 core
 
 // In
-in vec3 texCoord;
+in vec2 texCoord;
 
 // Out
-out vec3 value;
+out vec4 value;
 
 // Uniforms
 uniform sampler2D velocity;
@@ -18,9 +18,9 @@ void main()
   ivec2 t = ivec2(gl_FragCoord.xy);
 
   vec3 oC = texelFetch(obstacles, t, 0).xyz;
-  if (oC.x > 0) 
+  if (oC.x > 0.0) 
 	{
-		value = vec3(oC.yz, 0.0);
+		value = vec4(oC.yz, 0.0, 0.0);
 		return;
   }
 
@@ -41,15 +41,15 @@ void main()
   vec2 obstV = vec2(0);
   vec2 vMask = vec2(1);
 
-  if (oN.x > 0.0) { pN = pC; obstV.y = oN.z; vMask.y = 0; }
-  if (oS.x > 0.0) { pS = pC; obstV.y = oS.z; vMask.y = 0; }
-  if (oE.x > 0.0) { pE = pC; obstV.x = oE.y; vMask.x = 0; }
-  if (oW.x > 0.0) { pW = pC; obstV.x = oW.y; vMask.x = 0; }
+  if (oN.x > 0.0) { pN = pC; obstV.y = oN.z; vMask.y = 0.0; }
+  if (oS.x > 0.0) { pS = pC; obstV.y = oS.z; vMask.y = 0.0; }
+  if (oE.x > 0.0) { pE = pC; obstV.x = oE.y; vMask.x = 0.0; }
+  if (oW.x > 0.0) { pW = pC; obstV.x = oW.y; vMask.x = 0.0; }
 
   // Enforce the free-slip boundary condition
   vec2 oldV = texelFetch(velocity, t, 0).xy;
   vec2 grad = vec2(pE - pW, pN - pS) * gradientScale;
   vec2 newV = oldV - grad;
 
-  value = vec3((vMask * newV) + obstV, 0.0);  
+  value = vec4((vMask * newV) + obstV, 0.0, 0.0);  
 }

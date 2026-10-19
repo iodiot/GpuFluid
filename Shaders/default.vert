@@ -1,12 +1,11 @@
-#version 130
+#version 330 core
 
 // In
-in vec3 vertexPosition;
-in vec3 vertexTexCoord;
+layout(location = 0) in vec3 vertexPosition;
+layout(location = 1) in vec2 vertexTexCoord;
 
 // Out
-out vec3 texCoord;
-
+out vec2 texCoord;
 
 void main()
 {

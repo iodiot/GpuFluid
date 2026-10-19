@@ -1,10 +1,10 @@
-#version 130
+#version 330 core
 
 // In
-in vec3 texCoord;
+in vec2 texCoord;
 
 // Out
-out vec3 value;
+out vec4 value;
 
 // Uniforms
 uniform sampler2D velocity;
@@ -30,12 +30,12 @@ void main()
   vec3 oW = texelFetchOffset(obstacles, t, 0, ivec2(-1, 0)).xyz;
 
   // Use obstacle velocities for solid cells
-  if (oN.x > 0) vN = oN.yz;
-  if (oS.x > 0) vS = oS.yz;
-  if (oE.x > 0) vE = oE.yz;
-  if (oW.x > 0) vW = oW.yz;
+  if (oN.x > 0.0) vN = oN.yz;
+  if (oS.x > 0.0) vS = oS.yz;
+  if (oE.x > 0.0) vE = oE.yz;
+  if (oW.x > 0.0) vW = oW.yz;
 
   float div = -halfInverseCellSize * (vE.x - vW.x + vN.y - vS.y);
 	
-	value = vec3(div, 0.0, 0.0);
+	value = vec4(div, 0.0, 0.0, 0.0);
 }

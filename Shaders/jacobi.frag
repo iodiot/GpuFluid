@@ -1,10 +1,10 @@
-#version 130
+#version 330 core
 
 // In
-in vec3 texCoord;
+in vec2 texCoord;
 
 // Out
-out vec3 value;
+out vec4 value;
 
 // Uniforms
 uniform float dt;
@@ -39,5 +39,5 @@ void main()
   if (oW.x > 0.0) pW = pC;
 
   vec3 bC = texelFetch(divergence, t, 0).xyz;
-  value = (pW + pE + pS + pN + alpha * bC) * inverseBeta;
+  value = vec4((pW + pE + pS + pN + alpha * bC) * inverseBeta, 0.0);
 }

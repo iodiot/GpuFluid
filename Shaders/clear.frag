@@ -1,12 +1,9 @@
-#version 130
-
-// In
-in vec3 texCoord;
+#version 330 core
 
 // Out
-out vec3 value;
+out vec4 value;
 
 void main()
 {
-	value = vec3(1.0);
+	value = vec4(0.0);
 }

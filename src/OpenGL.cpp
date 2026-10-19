@@ -1,6 +1,9 @@
 #include "StdAfx.h"
 #include "OpenGL.h"
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
+
 // Two triangles
 const float positionData[] = {
 	-1.0f, -1.0f, 0.0f,
@@ -24,50 +27,26 @@ const float texCoordData[] = {
 
 GLuint Create2dTexture(int n)
 {
-	GLuint tid, sid;
+	GLuint tid;
 
 	glGenTextures(1, &tid);
 	glBindTexture(GL_TEXTURE_2D, tid);
 
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, n, n, 0, GL_RGB, GL_FLOAT, 0); 
+	// RGBA32F: RGB32F is not a guaranteed colour-renderable format in core GL
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, n, n, 0, GL_RGBA, GL_FLOAT, 0);
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
 
-	glTexParameteri(GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE, 0);
-	glTexParameteri(GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE, 0);
-
-	glGenSamplers(1, &sid);
-	glSamplerParameteri(sid, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glSamplerParameteri(sid, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glBindSampler(tid, sid);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
 	return tid;
 }
 
-GLuint Create3dTexture(int n)
-{
-	GLuint tid, sid;
-
-	glGenTextures(1, &tid);
-	glBindTexture(GL_TEXTURE_3D, tid);
-	glTexImage3D(GL_TEXTURE_3D, 0, GL_RGB32F, n, n, n, 0, GL_RGB, GL_FLOAT, 0); 
-
-	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_BASE_LEVEL, 0);
-	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAX_LEVEL, 0);
-
-	glTexParameteri(GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE, 0);
-	glTexParameteri(GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE, 0);
-
-	glGenSamplers(1, &sid);
-	glSamplerParameteri(sid, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glSamplerParameteri(sid, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glBindSampler(tid, sid);
-
-	return tid;
-}
-
-GLuint CreateShader(GLenum shaderType, const string &shaderSource)
+GLuint CreateShader(GLenum shaderType, const string &shaderSource, const string &name)
 {
 	GLuint shader = glCreateShader(shaderType);
 
@@ -83,13 +62,11 @@ GLuint CreateShader(GLenum shaderType, const string &shaderSource)
 		GLint infoLogLength;
 		glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &infoLogLength);
 
-		GLchar *infoLog = new GLchar[infoLogLength + 1];
-		glGetShaderInfoLog(shader, infoLogLength, 0, infoLog);
+		vector<GLchar> infoLog(infoLogLength + 1);
+		glGetShaderInfoLog(shader, infoLogLength, 0, infoLog.data());
 
-		char str[0xff];
-		sprintf(str, "Compile failure in %s shader:\n%s\n", shaderType == GL_VERTEX_SHADER ? "vertex" : "fragment", infoLog);
-		OutputDebugStringA(str);
-		delete[] infoLog;
+		fprintf(stderr, "Compile failure in %s:\n%s\n", name.c_str(), infoLog.data());
+		exit(EXIT_FAILURE);
 	}
 
 	return shader;
@@ -99,9 +76,8 @@ GLuint CreateProgram(const vector<GLuint> &shaders)
 {
 	GLuint program = glCreateProgram();
 
-	vector<GLuint>::const_iterator it;
-	for(it = shaders.begin(); it != shaders.end(); ++it)
-		glAttachShader(program, *it);
+	for (GLuint shader : shaders)
+		glAttachShader(program, shader);
 
 	glBindAttribLocation(program, 0, "vertexPosition");
 	glBindAttribLocation(program, 1, "vertexTexCoord");
@@ -116,13 +92,11 @@ GLuint CreateProgram(const vector<GLuint> &shaders)
 		GLint infoLogLength;
 		glGetProgramiv(program, GL_INFO_LOG_LENGTH, &infoLogLength);
 
-		GLchar *infoLog = new GLchar[infoLogLength + 1];
-		glGetProgramInfoLog(program, infoLogLength, 0, infoLog);
+		vector<GLchar> infoLog(infoLogLength + 1);
+		glGetProgramInfoLog(program, infoLogLength, 0, infoLog.data());
 
-		char str[0xff];
-		sprintf(str, "Link failure: %s\n", infoLog);
-		OutputDebugStringA(str);
-		delete[] infoLog;
+		fprintf(stderr, "Link failure: %s\n", infoLog.data());
+		exit(EXIT_FAILURE);
 	}
 
 	return program;
@@ -130,23 +104,23 @@ GLuint CreateProgram(const vector<GLuint> &shaders)
 
 string LoadShaderAsString(const string &fileName)
 {
-	string line, result;
-	ifstream file;
+	// Look next to the working directory first, then in the source tree
+	const string candidates[] = { "Shaders/" + fileName, string(GPUFLUID_SHADER_DIR) + fileName };
 
-	file.open(fileName);
-
-	if (file.is_open())
+	for (const string &path : candidates)
 	{
-		while(!file.eof())
+		ifstream file(path);
+
+		if (file.is_open())
 		{
-			getline(file ,line); 
-			result += line + '\n';
+			stringstream ss;
+			ss << file.rdbuf();
+			return ss.str();
 		}
 	}
 
-	file.close();
-
-	return result;
+	fprintf(stderr, "Can't find shader %s\n", fileName.c_str());
+	exit(EXIT_FAILURE);
 }
 
 float NextFloat()
@@ -158,8 +132,8 @@ GLuint LoadProgram(const string &vertexShader, const string &fragmentShader)
 {
 	vector<GLuint> shaders;
 
-	shaders.push_back(CreateShader(GL_VERTEX_SHADER, LoadShaderAsString("Shaders/" + vertexShader + ".vert")));
-	shaders.push_back(CreateShader(GL_FRAGMENT_SHADER, LoadShaderAsString("Shaders/" + fragmentShader + ".frag")));
+	shaders.push_back(CreateShader(GL_VERTEX_SHADER, LoadShaderAsString(vertexShader + ".vert"), vertexShader + ".vert"));
+	shaders.push_back(CreateShader(GL_FRAGMENT_SHADER, LoadShaderAsString(fragmentShader + ".frag"), fragmentShader + ".frag"));
 
 	GLuint handle = CreateProgram(shaders);
 
@@ -180,11 +154,11 @@ GLuint InitializeBuffers()
 
 	// Populate position buffer
 	glBindBuffer(GL_ARRAY_BUFFER, positionBufferHandle);
-	glBufferData(GL_ARRAY_BUFFER, 18 * sizeof(float), positionData, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(positionData), positionData, GL_STATIC_DRAW);
 
 	// Populate tex coord buffer
 	glBindBuffer(GL_ARRAY_BUFFER, texCoordBufferHandle);
-	glBufferData(GL_ARRAY_BUFFER, 12 * sizeof(float), texCoordData, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(texCoordData), texCoordData, GL_STATIC_DRAW);
 
 	// Create and set-up vertex array object
 	glGenVertexArrays(1, &handle);
@@ -205,15 +179,23 @@ GLuint InitializeBuffers()
 	return handle;
 }
 
-void PrintLastError()
+void PrintLastError(const char *where)
 {
-	GLenum code = glGetError(); 
+	GLenum code = glGetError();
 
-	if (code != GL_NO_ERROR) 
-	{
-    const GLubyte *message = gluErrorString(code);
-		char str[0xff];
-		sprintf(str, "OpenGL error: %s\n", message);
-		OutputDebugStringA(str);
-	}
+	if (code != GL_NO_ERROR)
+		fprintf(stderr, "OpenGL error 0x%04x at %s\n", code, where);
+}
+
+bool SaveScreenshot(const string &fileName, int width, int height)
+{
+	vector<unsigned char> pixels(width * height * 3);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glPixelStorei(GL_PACK_ALIGNMENT, 1);
+	glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+
+	// OpenGL rows go bottom-up, PNG rows top-down
+	stbi_flip_vertically_on_write(1);
+	return stbi_write_png(fileName.c_str(), width, height, 3, pixels.data(), width * 3) != 0;
 }
